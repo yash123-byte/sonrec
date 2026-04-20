@@ -1,0 +1,124 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music App</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+<div id="debug"></div>
+<!-- Background Video -->
+<video autoplay muted loop id="bgVideo">
+    <source id="videoSource" type="video/mp4">
+</video>
+
+<h2 id="welcome">Welcome {{ user_name }}</h2>
+
+<audio id="player" controls>
+    <source id="audioSource" type="audio/mpeg">
+</audio>
+
+<div id="buttons">
+    <button onclick="startApp()">Start</button>
+    <button onclick="nextSong()">Next</button>
+    <button onclick="togglePlay()">Play / Pause</button>
+    <button onclick="playFullSong()">Full Song</button>
+</div>
+
+<script>
+let player = document.getElementById("player");
+let audioSource = document.getElementById("audioSource");
+
+let bgVideo = document.getElementById("bgVideo");
+let videoSource = document.getElementById("videoSource");
+
+let currentSong = null;
+let previewWatch = 0;
+let fullMode = false;
+let startedAt = 0;
+
+function loadSong(data) {
+    currentSong = data;
+
+    previewWatch = 0;
+    fullMode = false;
+
+    player.pause();
+    player.currentTime = 0;
+    audioSource.src =
+    `https://storage.googleapis.com/songrecco/static/preview/preview_${currentSong.song}.mp3`
+    player.load();
+
+    player.play()
+    .then(()=> startedAt = Date.now())
+    .catch(err => console.log(err));
+    videoSource.src =
+    `https://storage.googleapis.com/songrecco/static/theme/${currentSong.song}.mp4`
+
+    bgVideo.load();
+    bgVideo.play();
+}
+
+async function startApp() {
+    const res = await fetch("/start");
+    const data = await res.json();
+    loadSong(data);
+}
+
+function togglePlay() {
+    if (player.paused) {
+        player.play();
+    } else {
+        player.pause();
+    }
+}
+
+function playFullSong() {
+    if (!currentSong) return;
+
+    audioSource.src =
+    `https://storage.googleapis.com/songrecco/static/theme/${currentSong.song}.webm`
+    player.pause();
+    player.currentTime = 0;
+    player.load();
+    player.play();
+
+    fullMode = true;
+    startedAt = Date.now();
+}
+
+async function nextSong() {
+    if (!currentSong) return;
+
+    let now = Date.now();
+    let preview = previewWatch;
+
+    if (!fullMode) {
+        preview += (now - startedAt) / 1000;
+    }
+
+    const res = await fetch("/recommend", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            song: currentSong.song,
+            artist: currentSong.artist,
+            preview_time: preview,
+            visits: 1
+        })
+    });
+
+    const data = await res.json();
+    loadSong(data);
+}
+</script>
+
+</body>
+</html>
+
